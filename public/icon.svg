@@ -1,4 +1,15 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
   <rect width="512" height="512" fill="#1a1a2e" rx="100"/>
-  <text x="256" y="350" font-size="300" text-anchor="middle" fill="#ffc107">🏆</text>
+  <!-- Trophy cup -->
+  <path d="M160 120 H352 V200 C352 280 310 340 256 360 C202 340 160 280 160 200 Z" fill="#ffc107"/>
+  <!-- Left handle -->
+  <path d="M160 140 H120 C100 140 80 160 80 190 C80 230 110 260 150 260 H160 V220 H150 C135 220 120 205 120 190 C120 180 125 175 135 175 H160 Z" fill="#ffc107"/>
+  <!-- Right handle -->
+  <path d="M352 140 H392 C412 140 432 160 432 190 C432 230 402 260 362 260 H352 V220 H362 C377 220 392 205 392 190 C392 180 387 175 377 175 H352 Z" fill="#ffc107"/>
+  <!-- Stem -->
+  <rect x="231" y="360" width="50" height="50" fill="#ffc107"/>
+  <!-- Base -->
+  <rect x="181" y="400" width="150" height="25" rx="5" fill="#ffc107"/>
+  <!-- Shine effect -->
+  <ellipse cx="210" cy="200" rx="25" ry="40" fill="#ffe066" opacity="0.5"/>
 </svg>
