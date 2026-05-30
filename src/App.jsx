@@ -318,8 +318,8 @@ function App() {
           <button className="btn btn-copy" onClick={handleCopyMissing}>
             {copied ? '✅ Copiado!' : '📋 Copiar Faltantes'}
           </button>
-          <button className="btn btn-help" onClick={() => setShowHelp(true)}>❓ Ajuda</button>
           <button className="btn btn-reset" onClick={handleReset}>🗑️ Limpar</button>
+          <button className="btn btn-help" onClick={() => setShowHelp(true)}>❓ Ajuda</button>
         </div>
         <div className="legend">
           <button 
@@ -431,9 +431,6 @@ function App() {
       </main>
 
       <footer className="footer no-print">
-        <p>Clica num cromo para marcar: 1º clique = ✅ Tenho | 2º clique = 🔄 Repetido | 3º clique = Limpar</p>
-        <p>Possibilidade de filtrar por: Em falta, Tenho, Repetido e também selecionando o país</p>
-        <p className="footer-hint">🔐 Ao registar, guarda a seleção atual na cloud | Ao sair, limpa tudo localmente</p>
         <p className="signature">made by Leonor Pereira ⚽</p>
       </footer>
 
