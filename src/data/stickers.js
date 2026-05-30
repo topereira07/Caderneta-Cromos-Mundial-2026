@@ -57,6 +57,7 @@ const FLAGS = {
   CRO: '🇭🇷',
   GHA: '🇬🇭',
   PAN: '🇵🇦',
+  COCA: '🥤',
 };
 
 // Estrutura da caderneta
@@ -178,6 +179,17 @@ export const ALBUM_DATA = [
       { code: 'CRO', name: 'CROÁCIA', flag: FLAGS.CRO },
       { code: 'GHA', name: 'GANA', flag: FLAGS.GHA },
       { code: 'PAN', name: 'PANAMÁ', flag: FLAGS.PAN },
+    ],
+  },
+  {
+    group: 'COCA-COLA',
+    teams: [
+      {
+        code: 'CC',
+        name: 'COCA-COLA',
+        flag: FLAGS.COCA,
+        stickers: Array.from({ length: 12 }, (_, i) => `CC${i + 1}`),
+      },
     ],
   },
 ];
