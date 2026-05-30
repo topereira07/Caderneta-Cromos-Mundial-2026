@@ -277,6 +277,16 @@ body {
   box-shadow: 0 4px 12px rgba(76, 175, 80, 0.4);
 }
 
+.btn-copy {
+  background: linear-gradient(135deg, #2196f3, #1565c0);
+  color: white;
+}
+
+.btn-copy:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(33, 150, 243, 0.4);
+}
+
 .btn-reset {
   background: linear-gradient(135deg, #f44336, #c62828);
   color: white;

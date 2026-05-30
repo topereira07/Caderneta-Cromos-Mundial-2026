@@ -1,6 +1,7 @@
-import { useState } from 'react';
-import { supabase } from './lib/supabase';
 import './Login.css';
+
+import { supabase } from './lib/supabase';
+import { useState } from 'react';
 
 function Login({ onLogin }) {
   const [username, setUsername] = useState('');

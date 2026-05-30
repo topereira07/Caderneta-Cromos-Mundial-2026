@@ -1,7 +1,9 @@
-import { useState, useEffect, useCallback } from 'react';
-import { ALBUM_DATA, STICKER_STATUS, generateStickers, getTotalStickers } from './data/stickers';
-import { supabase } from './lib/supabase';
 import './App.css';
+
+import { ALBUM_DATA, STICKER_STATUS, generateStickers, getTotalStickers } from './data/stickers';
+import { useCallback, useEffect, useState } from 'react';
+
+import { supabase } from './lib/supabase';
 
 const STORAGE_KEY = 'cromos-fifa-2026';
 const LOCAL_USER_KEY = 'cromos-user';
@@ -18,6 +20,7 @@ function App() {
   const [authLoading, setAuthLoading] = useState(false);
   const [saving, setSaving] = useState(false);
   const [showAuthForm, setShowAuthForm] = useState(false);
+  const [copied, setCopied] = useState(false);
   const [filter, setFilter] = useState(null); // null, 'falta', 'tenho', 'repetido'
   const [countryFilter, setCountryFilter] = useState(''); // filtro por país
 
@@ -204,6 +207,50 @@ function App() {
     }
   };
 
+  // Gerar texto com cromos em falta
+  const generateMissingText = () => {
+    const lines = ['🏆 FIFA World Cup 2026', 'Cromos em Falta', ''];
+    let totalMissing = 0;
+    
+    ALBUM_DATA.forEach((groupData) => {
+      groupData.teams.forEach((team) => {
+        const teamStickers = generateStickers(team);
+        const missing = teamStickers.filter(
+          (id) => !stickerStates[id] || stickerStates[id] === STICKER_STATUS.NONE
+        );
+        
+        if (missing.length > 0) {
+          // Extrair só o número do sticker
+          const numbers = missing.map(id => {
+            const num = id.replace(/^[A-Z]+/, '').replace(/^0+/, '') || '0';
+            return num;
+          }).join(', ');
+          lines.push(`${team.code} ${team.flag}: ${numbers}`);
+          totalMissing += missing.length;
+        }
+      });
+    });
+    
+    lines.push('');
+    lines.push(`Total: ${totalMissing} cromos em falta`);
+    lines.push('');
+    lines.push('📱 cadernetacromosmundial2026.org');
+    
+    return lines.join('\n');
+  };
+
+  // Copiar lista de faltantes para clipboard
+  const handleCopyMissing = async () => {
+    const text = generateMissingText();
+    try {
+      await navigator.clipboard.writeText(text);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    } catch (err) {
+      console.error('Erro ao copiar:', err);
+    }
+  };
+
   return (
     <div className="app">
       <header className="header no-print">
@@ -264,6 +311,9 @@ function App() {
         </div>
         <div className="actions">
           <button className="btn btn-print" onClick={handlePrint}>🖨️ Imprimir</button>
+          <button className="btn btn-copy" onClick={handleCopyMissing}>
+            {copied ? '✅ Copiado!' : '📋 Copiar Faltantes'}
+          </button>
           <button className="btn btn-reset" onClick={handleReset}>🗑️ Limpar</button>
         </div>
         <div className="legend">
