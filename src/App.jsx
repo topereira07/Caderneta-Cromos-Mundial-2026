@@ -20,6 +20,7 @@ function App() {
   const [authLoading, setAuthLoading] = useState(false);
   const [showAuthForm, setShowAuthForm] = useState(false);
   const [copied, setCopied] = useState(false);
+  const [showHelp, setShowHelp] = useState(false);
   const [filter, setFilter] = useState(null); // null, 'falta', 'tenho', 'repetido'
   const [countryFilter, setCountryFilter] = useState(''); // filtro por país
 
@@ -317,6 +318,7 @@ function App() {
           <button className="btn btn-copy" onClick={handleCopyMissing}>
             {copied ? '✅ Copiado!' : '📋 Copiar Faltantes'}
           </button>
+          <button className="btn btn-help" onClick={() => setShowHelp(true)}>❓ Ajuda</button>
           <button className="btn btn-reset" onClick={handleReset}>🗑️ Limpar</button>
         </div>
         <div className="legend">
@@ -434,6 +436,88 @@ function App() {
         <p className="footer-hint">🔐 Ao registar, guarda a seleção atual na cloud | Ao sair, limpa tudo localmente</p>
         <p className="signature">made by Leonor Pereira ⚽</p>
       </footer>
+
+      {/* Modal de Ajuda */}
+      {showHelp && (
+        <div className="modal-overlay" onClick={() => setShowHelp(false)}>
+          <div className="modal-content" onClick={(e) => e.stopPropagation()}>
+            <button className="modal-close" onClick={() => setShowHelp(false)}>✕</button>
+            <h2>🏆 Caderneta FIFA World Cup 2026</h2>
+            <p className="modal-subtitle">Guia de utilização</p>
+            
+            <div className="help-section">
+              <h3>🎯 Como usar os cromos</h3>
+              <ul>
+                <li><strong>1º clique</strong> → <span className="status-green">█</span> Verde = Já tenho</li>
+                <li><strong>2º clique</strong> → <span className="status-yellow">█</span> Amarelo = Repetido</li>
+                <li><strong>3º clique</strong> → Limpa (volta ao estado inicial)</li>
+              </ul>
+            </div>
+
+            <div className="help-section">
+              <h3>🔍 Filtros</h3>
+              <ul>
+                <li><strong>Falta</strong> - Mostra apenas os cromos em falta</li>
+                <li><strong>Tenho</strong> - Mostra apenas os que já tens</li>
+                <li><strong>Repetido</strong> - Mostra apenas os repetidos</li>
+                <li><strong>Dropdown países</strong> - Filtra por seleção/país</li>
+              </ul>
+            </div>
+
+            <div className="help-section">
+              <h3>📱 Botões</h3>
+              <ul>
+                <li><strong>🖨️ Imprimir</strong> - Gera versão para impressão</li>
+                <li><strong>📋 Copiar Faltantes</strong> - Copia lista de cromos em falta para partilhar no WhatsApp/SMS</li>
+                <li><strong>🗑️ Limpar</strong> - Apaga todos os dados (pede confirmação)</li>
+              </ul>
+            </div>
+
+            <div className="help-section">
+              <h3>🔐 Conta e sincronização</h3>
+              <ul>
+                <li><strong>Registar</strong> - Cria conta e guarda na cloud</li>
+                <li><strong>Entrar</strong> - Carrega dados guardados</li>
+                <li><strong>Sair</strong> - Limpa dados locais (cloud mantém)</li>
+                <li>Sem conta = dados só no browser atual</li>
+              </ul>
+            </div>
+
+            <div className="help-section">
+              <h3>📲 Instalar no telemóvel</h3>
+              <div className="install-instructions">
+                <h4>🍎 iPhone (Safari)</h4>
+                <ol>
+                  <li>Abre esta página no Safari</li>
+                  <li>Toca no botão <strong>Partilhar</strong> (⬆️)</li>
+                  <li>Escolhe <strong>"Adicionar ao ecrã inicial"</strong></li>
+                  <li>Confirma o nome e toca <strong>Adicionar</strong></li>
+                </ol>
+                
+                <h4>🤖 Android (Chrome)</h4>
+                <ol>
+                  <li>Abre esta página no Chrome</li>
+                  <li>Toca no menu <strong>⋮</strong> (3 pontos)</li>
+                  <li>Escolhe <strong>"Adicionar ao ecrã inicial"</strong></li>
+                  <li>Confirma e toca <strong>Instalar</strong></li>
+                </ol>
+              </div>
+            </div>
+
+            <div className="help-section">
+              <h3>✨ Funcionalidades</h3>
+              <ul>
+                <li>✅ Funciona offline (depois de instalada)</li>
+                <li>✅ Guarda automaticamente no browser</li>
+                <li>✅ Sincroniza entre dispositivos (com conta)</li>
+                <li>✅ 980 cromos de 48 seleções + FIFA</li>
+              </ul>
+            </div>
+
+            <p className="modal-footer">made by Leonor Pereira ⚽</p>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
