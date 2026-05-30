@@ -431,7 +431,7 @@ function App() {
       </main>
 
       <footer className="footer no-print">
-        <p className="signature">made by Leonor Pereira ⚽</p>
+        <p className="signature">made by Maria Leonor Pereira ⚽</p>
       </footer>
 
       {/* Modal de Ajuda */}
@@ -511,7 +511,7 @@ function App() {
               </ul>
             </div>
 
-            <p className="modal-footer">made by Leonor Pereira ⚽</p>
+            <p className="modal-footer">made by Maria Leonor Pereira ⚽</p>
           </div>
         </div>
       )}
