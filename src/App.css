@@ -11,10 +11,173 @@ body {
   color: #fff;
 }
 
+/* Loading Screen */
+.loading-screen {
+  min-height: 100vh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%);
+}
+
+.loading-content {
+  text-align: center;
+}
+
+.loading-content h1 {
+  font-size: 2rem;
+  margin-bottom: 10px;
+}
+
+.loading-content p {
+  opacity: 0.7;
+}
+
 .app {
   max-width: 1400px;
   margin: 0 auto;
   padding: 20px;
+}
+
+/* User Bar */
+.user-bar {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 15px;
+  margin-bottom: 15px;
+  padding-bottom: 15px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+/* Auth Corner */
+.auth-corner {
+  position: absolute;
+  top: 20px;
+  right: 20px;
+  z-index: 100;
+}
+
+.user-logged {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  background: rgba(255, 255, 255, 0.1);
+  padding: 8px 15px;
+  border-radius: 20px;
+}
+
+.user-info {
+  font-size: 0.9rem;
+  color: rgba(255, 255, 255, 0.9);
+}
+
+.saving-indicator {
+  font-size: 0.9rem;
+  animation: pulse 1s infinite;
+}
+
+@keyframes pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.5; }
+}
+
+.btn-small {
+  padding: 6px 12px;
+  font-size: 0.8rem;
+  border: 1px solid rgba(255, 255, 255, 0.3);
+  border-radius: 15px;
+  background: rgba(255, 255, 255, 0.1);
+  color: #fff;
+  cursor: pointer;
+  transition: all 0.3s ease;
+}
+
+.btn-small:hover {
+  background: rgba(255, 255, 255, 0.2);
+}
+
+.auth-form {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  background: rgba(0, 0, 0, 0.8);
+  padding: 15px;
+  border-radius: 12px;
+  min-width: 200px;
+}
+
+.auth-form input {
+  padding: 8px 12px;
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  border-radius: 6px;
+  background: rgba(255, 255, 255, 0.1);
+  color: #fff;
+  font-size: 0.85rem;
+}
+
+.auth-form input::placeholder {
+  color: rgba(255, 255, 255, 0.5);
+}
+
+.auth-form input:focus {
+  outline: none;
+  border-color: #ffc107;
+}
+
+.auth-buttons {
+  display: flex;
+  gap: 5px;
+}
+
+.auth-buttons button {
+  flex: 1;
+  padding: 6px 10px;
+  border: none;
+  border-radius: 6px;
+  font-size: 0.8rem;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.auth-buttons button:first-child {
+  background: linear-gradient(135deg, #4caf50, #2e7d32);
+  color: white;
+}
+
+.auth-buttons button:nth-child(2) {
+  background: linear-gradient(135deg, #ffc107, #ff8f00);
+  color: black;
+}
+
+.auth-buttons .btn-cancel {
+  flex: 0;
+  padding: 6px 10px;
+  background: rgba(255, 255, 255, 0.1);
+  color: #fff;
+}
+
+.auth-error {
+  color: #ff6b6b;
+  font-size: 0.75rem;
+  text-align: center;
+  margin-top: 5px;
+}
+
+.btn-logout {
+  padding: 8px 16px;
+  font-size: 0.85rem;
+  border: 1px solid rgba(255, 255, 255, 0.3);
+  border-radius: 6px;
+  background: transparent;
+  color: #fff;
+  cursor: pointer;
+  transition: all 0.3s ease;
+}
+
+.btn-logout:hover {
+  background: rgba(255, 255, 255, 0.1);
+  border-color: rgba(255, 255, 255, 0.5);
 }
 
 /* Header */
@@ -25,6 +188,7 @@ body {
   border-radius: 16px;
   margin-bottom: 30px;
   backdrop-filter: blur(10px);
+  position: relative;
 }
 
 .header h1 {
@@ -125,6 +289,53 @@ body {
   align-items: center;
   gap: 8px;
   font-size: 0.9rem;
+  background: transparent;
+  border: 2px solid transparent;
+  padding: 8px 15px;
+  border-radius: 20px;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  color: #fff;
+}
+
+.legend-item:hover {
+  background: rgba(255, 255, 255, 0.1);
+}
+
+.legend-item.active {
+  background: rgba(255, 255, 255, 0.2);
+  border-color: #ffc107;
+}
+
+/* Country Filter */
+.country-filter {
+  margin-top: 15px;
+}
+
+.country-select {
+  padding: 10px 15px;
+  font-size: 0.95rem;
+  border: 2px solid rgba(255, 255, 255, 0.2);
+  border-radius: 10px;
+  background: rgba(255, 255, 255, 0.1);
+  color: #fff;
+  cursor: pointer;
+  min-width: 200px;
+  transition: all 0.3s ease;
+}
+
+.country-select:hover {
+  border-color: rgba(255, 255, 255, 0.4);
+}
+
+.country-select:focus {
+  outline: none;
+  border-color: #ffc107;
+}
+
+.country-select option {
+  background: #1a1a2e;
+  color: #fff;
 }
 
 .legend-box {
@@ -264,6 +475,12 @@ body {
   margin-top: 30px;
   opacity: 0.7;
   font-size: 0.9rem;
+}
+
+.footer-hint {
+  margin-top: 8px;
+  font-size: 0.8rem;
+  opacity: 0.8;
 }
 
 .signature {
