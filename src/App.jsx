@@ -18,7 +18,6 @@ function App() {
   const [password, setPassword] = useState('');
   const [authError, setAuthError] = useState('');
   const [authLoading, setAuthLoading] = useState(false);
-  const [saving, setSaving] = useState(false);
   const [showAuthForm, setShowAuthForm] = useState(false);
   const [copied, setCopied] = useState(false);
   const [filter, setFilter] = useState(null); // null, 'falta', 'tenho', 'repetido'
@@ -35,23 +34,8 @@ function App() {
     return saved ? JSON.parse(saved) : {};
   });
 
-  // Guardar no localStorage sempre
-  useEffect(() => {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(stickerStates));
-    // Se estiver logado, sincronizar com Supabase
-    if (user) {
-      syncToSupabase();
-    }
-  }, [stickerStates]);
-
-  // Carregar do Supabase quando faz login
-  useEffect(() => {
-    if (user) {
-      loadFromSupabase();
-    }
-  }, [user]);
-
-  const loadFromSupabase = async () => {
+  const loadFromSupabase = useCallback(async () => {
+    if (!user) return null;
     try {
       const { data } = await supabase
         .from('sticker_data')
@@ -60,30 +44,49 @@ function App() {
         .single();
 
       if (data?.stickers && Object.keys(data.stickers).length > 0) {
-        setStickerStates(data.stickers);
-        localStorage.setItem(STORAGE_KEY, JSON.stringify(data.stickers));
+        return data.stickers;
       }
     } catch (err) {
       console.error('Erro ao carregar:', err);
     }
-  };
+    return null;
+  }, [user]);
 
-  const syncToSupabase = async () => {
+  const syncToSupabase = useCallback(async (stickers) => {
     if (!user) return;
-    setSaving(true);
     try {
       await supabase
         .from('sticker_data')
         .upsert({ 
           user_id: user.id, 
-          stickers: stickerStates,
+          stickers: stickers,
           updated_at: new Date().toISOString()
         }, { onConflict: 'user_id' });
     } catch (err) {
       console.error('Erro ao sincronizar:', err);
     }
-    setSaving(false);
-  };
+  }, [user]);
+
+  // Guardar no localStorage sempre
+  useEffect(() => {
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(stickerStates));
+    // Se estiver logado, sincronizar com Supabase
+    if (user) {
+      syncToSupabase(stickerStates);
+    }
+  }, [stickerStates, user, syncToSupabase]);
+
+  // Carregar do Supabase quando faz login
+  useEffect(() => {
+    if (user) {
+      loadFromSupabase().then((data) => {
+        if (data) {
+          setStickerStates(data);
+          localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
+        }
+      });
+    }
+  }, [user, loadFromSupabase]);
 
   // Login
   const handleLogin = async () => {
@@ -178,8 +181,9 @@ function App() {
       const nextStatus = (currentStatus + 1) % 3;
       
       if (nextStatus === STICKER_STATUS.NONE) {
-        const { [stickerId]: _, ...rest } = prev;
-        return rest;
+        const newState = { ...prev };
+        delete newState[stickerId];
+        return newState;
       }
       
       return { ...prev, [stickerId]: nextStatus };
@@ -259,7 +263,6 @@ function App() {
           {user ? (
             <div className="user-logged">
               <span className="user-info">👤 {user.username}</span>
-              {saving && <span className="saving-indicator">💾</span>}
               <button className="btn-small" onClick={handleLogout}>Sair</button>
             </div>
           ) : (
@@ -427,6 +430,7 @@ function App() {
 
       <footer className="footer no-print">
         <p>Clica num cromo para marcar: 1º clique = ✅ Tenho | 2º clique = 🔄 Repetido | 3º clique = Limpar</p>
+        <p>Possibilidade de filtrar por: Em falta, Tenho, Repetido e também selecionando o país</p>
         <p className="footer-hint">🔐 Ao registar, guarda a seleção atual na cloud | Ao sair, limpa tudo localmente</p>
         <p className="signature">made by Leonor Pereira ⚽</p>
       </footer>
