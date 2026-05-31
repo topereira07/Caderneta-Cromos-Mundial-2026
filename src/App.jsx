@@ -61,7 +61,6 @@ function App() {
 
   const loadFromSupabase = useCallback(async () => {
     if (!user) return null;
-    console.log('[Load] Tentando carregar para user_id:', user.id);
     try {
       const { data, error } = await supabase
         .from('sticker_data')
@@ -75,10 +74,8 @@ function App() {
       }
 
       if (data?.stickers && Object.keys(data.stickers).length > 0) {
-        console.log('[Load] Dados encontrados:', Object.keys(data.stickers).length, 'cromos');
         return data.stickers;
       }
-      console.log('[Load] Sem dados ou vazio');
     } catch (err) {
       console.error('[Load] ERRO catch:', err);
     }
@@ -87,10 +84,8 @@ function App() {
 
   const syncToSupabase = useCallback(async (stickers) => {
     if (!user) return;
-    const numStickers = Object.keys(stickers || {}).length;
-    console.log('[Sync] Enviando', numStickers, 'cromos para cloud, user_id:', user.id);
     try {
-      const { data, error } = await supabase
+      const { error } = await supabase
         .from('sticker_data')
         .upsert({ 
           user_id: user.id, 
@@ -100,9 +95,7 @@ function App() {
         .select();
       
       if (error) {
-        console.error('[Sync] ERRO Supabase:', error.message, error.details, error.hint);
-      } else {
-        console.log('[Sync] Sucesso! Dados salvos:', data);
+        console.error('[Sync] ERRO:', error.message);
       }
     } catch (err) {
       console.error('[Sync] ERRO catch:', err);
@@ -113,42 +106,30 @@ function App() {
   useEffect(() => {
     localStorage.setItem(STORAGE_KEY, JSON.stringify(stickerStates));
     
-    // Debug: mostrar estado atual
     const numStickers = Object.keys(stickerStates).length;
-    console.log(`[Effect] stickerStates mudou: ${numStickers} cromos, user: ${user?.id || 'null'}, cloudLoaded: ${isCloudLoaded.current}, userCleared: ${userClearedData.current}`);
     
     // Só sincroniza se:
     // 1. Tem user logado
     // 2. Já carregou da cloud
     // 3. Tem cromos OU o utilizador limpou intencionalmente
     if (user && isCloudLoaded.current && (numStickers > 0 || userClearedData.current)) {
-      console.log('[Effect] -> Vai sincronizar');
       syncToSupabase(stickerStates);
-      userClearedData.current = false; // Reset após sincronizar
-    } else {
-      console.log('[Effect] -> NÃO sincroniza:', !user ? 'sem user' : !isCloudLoaded.current ? 'cloud não carregada' : 'sem cromos e não foi limpo pelo user');
+      userClearedData.current = false;
     }
   }, [stickerStates, user, syncToSupabase]);
 
   // Carregar do Supabase quando faz login
   useEffect(() => {
     if (user) {
-      console.log('[UserEffect] User mudou, resetando cloudLoaded para false');
-      isCloudLoaded.current = false; // Reset PRIMEIRO
-      console.log('[UserEffect] Carregando do Supabase para user:', user.id);
+      isCloudLoaded.current = false;
       loadFromSupabase().then((data) => {
         if (data) {
-          console.log('[UserEffect] Recebidos', Object.keys(data).length, 'cromos - atualizando state');
           setStickerStates(data);
           localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
-        } else {
-          console.log('[UserEffect] Nenhum dado na cloud');
         }
-        console.log('[UserEffect] Marcando cloudLoaded = true');
         isCloudLoaded.current = true;
       });
     } else {
-      console.log('[UserEffect] User é null, resetando cloudLoaded');
       isCloudLoaded.current = false;
     }
   }, [user, loadFromSupabase]);
@@ -197,9 +178,8 @@ function App() {
             table: 'messages',
             filter: `to_user_id=eq.${user.id}`
           },
-          (payload) => {
-            console.log('[Realtime] Nova mensagem recebida:', payload);
-            loadMessages(); // Recarregar todas as mensagens
+          () => {
+            loadMessages();
           }
         )
         .subscribe();
@@ -484,8 +464,7 @@ function App() {
       return;
     }
 
-    // IMPORTANTE: Desativar sync ANTES de mudar o user
-    console.log('[Login] Desativando sync antes de setUser');
+    // Desativar sync ANTES de mudar o user
     isCloudLoaded.current = false;
     
     setUser(userData);
@@ -552,7 +531,6 @@ function App() {
     setStickerStates({});
     localStorage.removeItem(LOCAL_USER_KEY);
     localStorage.removeItem(STORAGE_KEY);
-    console.log('[Logout] Dados locais limpos, cloud mantida intacta');
   };
 
   // Handler de clique num sticker

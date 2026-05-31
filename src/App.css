@@ -981,6 +981,7 @@ body {
 .message-item {
   background: rgba(255, 255, 255, 0.08);
   padding: 12px;
+  padding-right: 40px;
   border-radius: 10px;
   cursor: pointer;
   transition: all 0.2s ease;
@@ -1195,10 +1196,6 @@ body {
 }
 
 /* Delete individual message */
-.message-item {
-  position: relative;
-}
-
 .btn-delete-msg {
   position: absolute;
   top: 8px;
@@ -1217,6 +1214,7 @@ body {
   align-items: center;
   justify-content: center;
   line-height: 1;
+  z-index: 2;
 }
 
 .btn-delete-msg:hover {
