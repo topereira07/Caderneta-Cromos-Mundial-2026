@@ -307,6 +307,22 @@ body {
   box-shadow: 0 4px 12px rgba(244, 67, 54, 0.4);
 }
 
+.btn-restore {
+  background: linear-gradient(135deg, #ff9800, #f57c00);
+  color: white;
+  animation: pulse 1.5s infinite;
+}
+
+.btn-restore:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(255, 152, 0, 0.4);
+}
+
+@keyframes pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.8; }
+}
+
 /* Legend */
 .legend {
   display: flex;

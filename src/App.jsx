@@ -21,6 +21,7 @@ function App() {
   const [showAuthForm, setShowAuthForm] = useState(false);
   const [copied, setCopied] = useState(false);
   const [showHelp, setShowHelp] = useState(false);
+  const [backupStickers, setBackupStickers] = useState(null); // Para restaurar após limpar
   const isCloudLoaded = useRef(false); // Previne sync antes de carregar
   const [filter, setFilter] = useState(null); // null, 'falta', 'tenho', 'repetido'
   const [countryFilter, setCountryFilter] = useState(''); // filtro por país
@@ -258,8 +259,17 @@ function App() {
   const handlePrint = () => window.print();
   
   const handleReset = () => {
+    if (Object.keys(stickerStates).length === 0) return;
     if (window.confirm('Tens a certeza que queres limpar toda a caderneta?')) {
+      setBackupStickers(stickerStates); // Guardar backup antes de limpar
       setStickerStates({});
+    }
+  };
+
+  const handleRestore = () => {
+    if (backupStickers && Object.keys(backupStickers).length > 0) {
+      setStickerStates(backupStickers);
+      setBackupStickers(null);
     }
   };
 
@@ -369,7 +379,11 @@ function App() {
           <button className="btn btn-copy" onClick={handleCopyMissing}>
             {copied ? '✅ Copiado!' : '📋 Copiar Faltantes'}
           </button>
-          <button className="btn btn-reset" onClick={handleReset}>🗑️ Limpar</button>
+          {backupStickers ? (
+            <button className="btn btn-restore" onClick={handleRestore}>↩️ Restaurar</button>
+          ) : (
+            <button className="btn btn-reset" onClick={handleReset}>🗑️ Limpar</button>
+          )}
           <button className="btn btn-help" onClick={() => setShowHelp(true)}>❓ Ajuda</button>
         </div>
         <div className="legend">
