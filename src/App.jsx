@@ -27,6 +27,15 @@ function App() {
   const [filter, setFilter] = useState(null); // null, 'falta', 'tenho', 'repetido'
   const [countryFilter, setCountryFilter] = useState(''); // filtro por país
 
+  // Estado de mensagens
+  const [showMessages, setShowMessages] = useState(false);
+  const [messages, setMessages] = useState([]);
+  const [unreadCount, setUnreadCount] = useState(0);
+  const [newMessageTo, setNewMessageTo] = useState('');
+  const [newMessageText, setNewMessageText] = useState('');
+  const [messageError, setMessageError] = useState('');
+  const [messageSending, setMessageSending] = useState(false);
+
   // Lista de todos os países para o dropdown
   const allCountries = ALBUM_DATA.flatMap(group => 
     group.teams.map(team => ({ code: team.code, name: team.name, flag: team.flag, group: group.group }))
@@ -131,6 +140,136 @@ function App() {
       isCloudLoaded.current = false;
     }
   }, [user, loadFromSupabase]);
+
+  // Carregar mensagens quando user está logado
+  const loadMessages = useCallback(async () => {
+    if (!user) return;
+    try {
+      const { data, error } = await supabase
+        .from('messages')
+        .select(`
+          *,
+          from_user:users!messages_from_user_id_fkey(username)
+        `)
+        .eq('to_user_id', user.id)
+        .order('created_at', { ascending: false });
+      
+      if (error) {
+        console.error('[Messages] Erro ao carregar:', error);
+        return;
+      }
+      
+      setMessages(data || []);
+      setUnreadCount((data || []).filter(m => !m.read).length);
+    } catch (err) {
+      console.error('[Messages] Erro:', err);
+    }
+  }, [user]);
+
+  // Carregar mensagens e configurar Realtime quando user muda
+  useEffect(() => {
+    if (user) {
+      loadMessages();
+      
+      // Subscrever Realtime para novas mensagens
+      const subscription = supabase
+        .channel('messages-channel')
+        .on(
+          'postgres_changes',
+          {
+            event: 'INSERT',
+            schema: 'public',
+            table: 'messages',
+            filter: `to_user_id=eq.${user.id}`
+          },
+          (payload) => {
+            console.log('[Realtime] Nova mensagem recebida:', payload);
+            loadMessages(); // Recarregar todas as mensagens
+          }
+        )
+        .subscribe();
+      
+      return () => {
+        supabase.removeChannel(subscription);
+      };
+    } else {
+      setMessages([]);
+      setUnreadCount(0);
+    }
+  }, [user, loadMessages]);
+
+  // Enviar mensagem
+  const sendMessage = async () => {
+    if (!user || !newMessageTo.trim() || !newMessageText.trim()) {
+      setMessageError('Preenche o destinatário e a mensagem');
+      return;
+    }
+    
+    setMessageSending(true);
+    setMessageError('');
+    
+    try {
+      // Encontrar utilizador pelo username
+      const { data: targetUser, error: userError } = await supabase
+        .from('users')
+        .select('id, username')
+        .eq('username', newMessageTo.toLowerCase().trim())
+        .single();
+      
+      if (userError || !targetUser) {
+        setMessageError('Utilizador não encontrado');
+        setMessageSending(false);
+        return;
+      }
+      
+      if (targetUser.id === user.id) {
+        setMessageError('Não podes enviar mensagem a ti próprio');
+        setMessageSending(false);
+        return;
+      }
+      
+      // Enviar mensagem
+      const { error: sendError } = await supabase
+        .from('messages')
+        .insert([{
+          from_user_id: user.id,
+          to_user_id: targetUser.id,
+          message: newMessageText.trim()
+        }]);
+      
+      if (sendError) {
+        setMessageError('Erro ao enviar mensagem');
+        setMessageSending(false);
+        return;
+      }
+      
+      setNewMessageTo('');
+      setNewMessageText('');
+      setMessageError('');
+      alert(`Mensagem enviada para ${targetUser.username}!`);
+    } catch (err) {
+      console.error('[Messages] Erro ao enviar:', err);
+      setMessageError('Erro ao enviar');
+    }
+    setMessageSending(false);
+  };
+
+  // Marcar mensagem como lida
+  const markAsRead = async (messageId) => {
+    try {
+      await supabase
+        .from('messages')
+        .update({ read: true })
+        .eq('id', messageId);
+      
+      setMessages(prev => prev.map(m => 
+        m.id === messageId ? { ...m, read: true } : m
+      ));
+      setUnreadCount(prev => Math.max(0, prev - 1));
+    } catch (err) {
+      console.error('[Messages] Erro ao marcar como lida:', err);
+    }
+  };
 
   // Login
   const handleLogin = async () => {
@@ -325,6 +464,9 @@ function App() {
           {user ? (
             <div className="user-logged">
               <span className="user-info">👤 {user.username}</span>
+              <button className="btn-small btn-messages" onClick={() => { setShowMessages(true); loadMessages(); }}>
+                💬 {unreadCount > 0 && <span className="badge">{unreadCount}</span>}
+              </button>
               <button className="btn-small" onClick={handleLogout}>Sair</button>
             </div>
           ) : (
@@ -577,6 +719,77 @@ function App() {
             </div>
 
             <p className="modal-footer">made by Maria Leonor Pereira ⚽</p>
+          </div>
+        </div>
+      )}
+
+      {/* Modal de Mensagens */}
+      {showMessages && (
+        <div className="modal-overlay" onClick={() => setShowMessages(false)}>
+          <div className="modal-content messages-modal" onClick={(e) => e.stopPropagation()}>
+            <button className="modal-close" onClick={() => setShowMessages(false)}>×</button>
+            <h2>💬 Mensagens</h2>
+            
+            {/* Enviar nova mensagem */}
+            <div className="message-compose">
+              <h3>📝 Nova Mensagem</h3>
+              <input
+                type="text"
+                placeholder="Username do destinatário"
+                value={newMessageTo}
+                onChange={(e) => setNewMessageTo(e.target.value)}
+                disabled={messageSending}
+              />
+              <textarea
+                placeholder="Escreve a tua mensagem..."
+                value={newMessageText}
+                onChange={(e) => setNewMessageText(e.target.value)}
+                disabled={messageSending}
+                rows={3}
+              />
+              {messageError && <p className="error-text">{messageError}</p>}
+              <button 
+                className="btn-copy" 
+                onClick={sendMessage} 
+                disabled={messageSending}
+              >
+                {messageSending ? 'A enviar...' : '📤 Enviar'}
+              </button>
+            </div>
+
+            {/* Inbox */}
+            <div className="message-inbox">
+              <h3>📥 Recebidas ({messages.length})</h3>
+              {messages.length === 0 ? (
+                <p className="no-messages">Não tens mensagens</p>
+              ) : (
+                <div className="messages-list">
+                  {messages.map((msg) => (
+                    <div 
+                      key={msg.id} 
+                      className={`message-item ${!msg.read ? 'unread' : ''}`}
+                      onClick={() => !msg.read && markAsRead(msg.id)}
+                    >
+                      <div className="message-header">
+                        <span className="message-from">
+                          👤 {msg.from_user?.username || 'Desconhecido'}
+                        </span>
+                        <span className="message-date">
+                          {new Date(msg.created_at).toLocaleString('pt-PT', {
+                            day: '2-digit',
+                            month: '2-digit',
+                            hour: '2-digit',
+                            minute: '2-digit'
+                          })}
+                        </span>
+                      </div>
+                      <p className="message-text">{msg.message}</p>
+                      {!msg.read && <span className="new-badge">Nova</span>}
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
           </div>
         </div>
       )}
