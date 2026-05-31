@@ -38,18 +38,26 @@ function App() {
 
   const loadFromSupabase = useCallback(async () => {
     if (!user) return null;
+    console.log('[Load] Tentando carregar para user_id:', user.id);
     try {
-      const { data } = await supabase
+      const { data, error } = await supabase
         .from('sticker_data')
         .select('stickers')
         .eq('user_id', user.id)
         .single();
 
+      if (error) {
+        console.error('[Load] ERRO Supabase:', error.message, error.code, error.details);
+        return null;
+      }
+
       if (data?.stickers && Object.keys(data.stickers).length > 0) {
+        console.log('[Load] Dados encontrados:', Object.keys(data.stickers).length, 'cromos');
         return data.stickers;
       }
+      console.log('[Load] Sem dados ou vazio');
     } catch (err) {
-      console.error('Erro ao carregar:', err);
+      console.error('[Load] ERRO catch:', err);
     }
     return null;
   }, [user]);
@@ -61,22 +69,24 @@ function App() {
       console.log('[Sync] Ignorado - estado vazio');
       return;
     }
-    console.log('[Sync] Enviando', Object.keys(stickers).length, 'cromos para cloud');
+    console.log('[Sync] Enviando', Object.keys(stickers).length, 'cromos para cloud, user_id:', user.id);
     try {
-      const { error } = await supabase
+      const { data, error } = await supabase
         .from('sticker_data')
         .upsert({ 
           user_id: user.id, 
           stickers: stickers,
           updated_at: new Date().toISOString()
-        }, { onConflict: 'user_id' });
+        }, { onConflict: 'user_id' })
+        .select();
+      
       if (error) {
-        console.error('[Sync] Erro:', error);
+        console.error('[Sync] ERRO Supabase:', error.message, error.details, error.hint);
       } else {
-        console.log('[Sync] Sucesso!');
+        console.log('[Sync] Sucesso! Dados salvos:', data);
       }
     } catch (err) {
-      console.error('[Sync] Erro ao sincronizar:', err);
+      console.error('[Sync] ERRO catch:', err);
     }
   }, [user]);
 
