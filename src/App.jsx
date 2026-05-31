@@ -199,10 +199,13 @@ function App() {
 
   // Logout
   const handleLogout = () => {
+    // IMPORTANTE: Desativar sync ANTES de limpar dados
+    isCloudLoaded.current = false;
     setUser(null);
     setStickerStates({});
     localStorage.removeItem(LOCAL_USER_KEY);
     localStorage.removeItem(STORAGE_KEY);
+    console.log('[Logout] Dados locais limpos, cloud mantida intacta');
   };
 
   // Handler de clique num sticker
