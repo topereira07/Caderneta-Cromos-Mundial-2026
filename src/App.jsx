@@ -750,11 +750,15 @@ function App() {
           <button className="btn btn-help" onClick={() => setShowHelp(true)}>❓ Ajuda</button>
         </div>
         <div className="actions actions-secondary">
-          <button className="btn btn-export" onClick={handleExport}>💾 Exportar</button>
-          <label className="btn btn-import">
-            📂 Importar
-            <input type="file" accept=".json" onChange={handleImport} hidden />
-          </label>
+          {user && (
+            <>
+              <button className="btn btn-export" onClick={handleExport}>💾 Exportar</button>
+              <label className="btn btn-import">
+                📂 Importar
+                <input type="file" accept=".json" onChange={handleImport} hidden />
+              </label>
+            </>
+          )}
           {backupStickers ? (
             <button className="btn btn-restore" onClick={handleRestore}>↩️ Restaurar</button>
           ) : (
