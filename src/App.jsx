@@ -111,11 +111,15 @@ function App() {
     // Só sincroniza se:
     // 1. Tem user logado
     // 2. Já carregou da cloud
-    // 3. Tem cromos OU o utilizador limpou intencionalmente
-    if (user && isCloudLoaded.current && (numStickers > 0 || userClearedData.current)) {
+    // 3. Tem cromos OU o utilizador limpou intencionalmente (com confirmação)
+    if (user && isCloudLoaded.current && numStickers > 0) {
+      syncToSupabase(stickerStates);
+    } else if (user && isCloudLoaded.current && numStickers === 0 && userClearedData.current) {
+      // Só envia vazio se o user EXPLICITAMENTE limpou
       syncToSupabase(stickerStates);
       userClearedData.current = false;
     }
+    // Se numStickers === 0 e NÃO foi o user que limpou, NÃO sincroniza (protege dados na cloud)
   }, [stickerStates, user, syncToSupabase]);
 
   // Carregar do Supabase quando faz login
