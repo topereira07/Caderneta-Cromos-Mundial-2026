@@ -23,6 +23,7 @@ function App() {
   const [showHelp, setShowHelp] = useState(false);
   const [backupStickers, setBackupStickers] = useState(null); // Para restaurar após limpar
   const isCloudLoaded = useRef(false); // Previne sync antes de carregar
+  const userClearedData = useRef(false); // Flag para permitir sync de dados vazios após limpar
   const [filter, setFilter] = useState(null); // null, 'falta', 'tenho', 'repetido'
   const [countryFilter, setCountryFilter] = useState(''); // filtro por país
 
@@ -65,18 +66,14 @@ function App() {
 
   const syncToSupabase = useCallback(async (stickers) => {
     if (!user) return;
-    // NUNCA sincronizar estados vazios - proteção contra perda de dados
-    if (!stickers || Object.keys(stickers).length === 0) {
-      console.log('[Sync] Ignorado - estado vazio');
-      return;
-    }
-    console.log('[Sync] Enviando', Object.keys(stickers).length, 'cromos para cloud, user_id:', user.id);
+    const numStickers = Object.keys(stickers || {}).length;
+    console.log('[Sync] Enviando', numStickers, 'cromos para cloud, user_id:', user.id);
     try {
       const { data, error } = await supabase
         .from('sticker_data')
         .upsert({ 
           user_id: user.id, 
-          stickers: stickers,
+          stickers: stickers || {},
           updated_at: new Date().toISOString()
         }, { onConflict: 'user_id' })
         .select();
@@ -97,17 +94,18 @@ function App() {
     
     // Debug: mostrar estado atual
     const numStickers = Object.keys(stickerStates).length;
-    console.log(`[Effect] stickerStates mudou: ${numStickers} cromos, user: ${user?.id || 'null'}, cloudLoaded: ${isCloudLoaded.current}`);
+    console.log(`[Effect] stickerStates mudou: ${numStickers} cromos, user: ${user?.id || 'null'}, cloudLoaded: ${isCloudLoaded.current}, userCleared: ${userClearedData.current}`);
     
     // Só sincroniza se:
     // 1. Tem user logado
     // 2. Já carregou da cloud
-    // 3. Tem cromos para sincronizar (proteção contra sobrescrever com vazio)
-    if (user && isCloudLoaded.current && numStickers > 0) {
+    // 3. Tem cromos OU o utilizador limpou intencionalmente
+    if (user && isCloudLoaded.current && (numStickers > 0 || userClearedData.current)) {
       console.log('[Effect] -> Vai sincronizar');
       syncToSupabase(stickerStates);
+      userClearedData.current = false; // Reset após sincronizar
     } else {
-      console.log('[Effect] -> NÃO sincroniza:', !user ? 'sem user' : !isCloudLoaded.current ? 'cloud não carregada' : 'sem cromos');
+      console.log('[Effect] -> NÃO sincroniza:', !user ? 'sem user' : !isCloudLoaded.current ? 'cloud não carregada' : 'sem cromos e não foi limpo pelo user');
     }
   }, [stickerStates, user, syncToSupabase]);
 
@@ -262,12 +260,14 @@ function App() {
     if (Object.keys(stickerStates).length === 0) return;
     if (window.confirm('Tens a certeza que queres limpar toda a caderneta?')) {
       setBackupStickers(stickerStates); // Guardar backup antes de limpar
+      userClearedData.current = true; // Permitir sync de dados vazios
       setStickerStates({});
     }
   };
 
   const handleRestore = () => {
     if (backupStickers && Object.keys(backupStickers).length > 0) {
+      userClearedData.current = false; // Cancelar a flag de limpeza
       setStickerStates(backupStickers);
       setBackupStickers(null);
     }
