@@ -1151,3 +1151,75 @@ body {
   color: #ce93d8;
   text-align: center;
 }
+
+/* Botão Enviar */
+.btn-send {
+  width: 100%;
+  background: linear-gradient(135deg, #4ecdc4, #44a08d) !important;
+}
+
+.btn-send:hover {
+  background: linear-gradient(135deg, #44a08d, #3d9980) !important;
+}
+
+.btn-send:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+/* Inbox header */
+.inbox-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 12px;
+}
+
+.inbox-header h3 {
+  margin: 0;
+}
+
+.btn-delete-all {
+  padding: 6px 12px;
+  border: none;
+  border-radius: 8px;
+  background: rgba(255, 82, 82, 0.2);
+  color: #ff5252;
+  font-size: 0.8rem;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.btn-delete-all:hover {
+  background: rgba(255, 82, 82, 0.4);
+}
+
+/* Delete individual message */
+.message-item {
+  position: relative;
+}
+
+.btn-delete-msg {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  width: 22px;
+  height: 22px;
+  border: none;
+  border-radius: 50%;
+  background: rgba(255, 82, 82, 0.3);
+  color: #ff5252;
+  font-size: 1rem;
+  font-weight: bold;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  line-height: 1;
+}
+
+.btn-delete-msg:hover {
+  background: rgba(255, 82, 82, 0.6);
+  color: #fff;
+}

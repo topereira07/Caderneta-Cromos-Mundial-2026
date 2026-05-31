@@ -286,6 +286,44 @@ function App() {
     }
   };
 
+  // Eliminar mensagem individual
+  const deleteMessage = async (messageId) => {
+    try {
+      await supabase
+        .from('messages')
+        .delete()
+        .eq('id', messageId);
+      
+      setMessages(prev => {
+        const msg = prev.find(m => m.id === messageId);
+        if (msg && !msg.read) {
+          setUnreadCount(c => Math.max(0, c - 1));
+        }
+        return prev.filter(m => m.id !== messageId);
+      });
+    } catch (err) {
+      console.error('[Messages] Erro ao eliminar:', err);
+    }
+  };
+
+  // Eliminar todas as mensagens
+  const deleteAllMessages = async () => {
+    if (!user || messages.length === 0) return;
+    if (!confirm('Eliminar todas as mensagens?')) return;
+    
+    try {
+      await supabase
+        .from('messages')
+        .delete()
+        .eq('to_user_id', user.id);
+      
+      setMessages([]);
+      setUnreadCount(0);
+    } catch (err) {
+      console.error('[Messages] Erro ao eliminar todas:', err);
+    }
+  };
+
   // Buscar utilizadores que têm os cromos que me faltam como repetidos
   const findWhoHasMyMissing = async () => {
     if (!user) return;
@@ -294,10 +332,20 @@ function App() {
     setShowWhoHas(true);
     
     try {
-      // Encontrar os cromos que me faltam
-      const myMissing = Object.entries(stickerStates)
-        .filter(([, status]) => status === STICKER_STATUS.NONE)
-        .map(([code]) => code);
+      // Gerar lista de TODOS os códigos de cromos
+      const allStickers = [];
+      ALBUM_DATA.forEach(group => {
+        group.teams.forEach(team => {
+          const teamStickers = generateStickers(team);
+          allStickers.push(...teamStickers);
+        });
+      });
+      
+      // Encontrar os cromos que me faltam (não existem no objeto OU status === 0)
+      const myMissing = allStickers.filter(code => {
+        const status = stickerStates[code];
+        return status === undefined || status === STICKER_STATUS.NONE;
+      });
       
       if (myMissing.length === 0) {
         setWhoHasData([]);
@@ -308,7 +356,7 @@ function App() {
       // Buscar todos os utilizadores e os seus cromos
       const { data: allUsers, error } = await supabase
         .from('sticker_data')
-        .select('user_id, stickers, users(username)')
+        .select('user_id, stickers')
         .neq('user_id', user.id);
       
       if (error) {
@@ -316,6 +364,18 @@ function App() {
         setWhoHasLoading(false);
         return;
       }
+      
+      // Buscar usernames separadamente
+      const userIds = (allUsers || []).map(u => u.user_id);
+      const { data: usersData } = await supabase
+        .from('users')
+        .select('id, username')
+        .in('id', userIds);
+      
+      const usernameMap = {};
+      (usersData || []).forEach(u => {
+        usernameMap[u.id] = u.username;
+      });
       
       // Para cada cromo que me falta, encontrar quem o tem repetido
       const results = [];
@@ -328,7 +388,7 @@ function App() {
           if (userStickers[stickerCode] === STICKER_STATUS.DUPLICATE) {
             usersWithDuplicate.push({
               id: userData.user_id,
-              username: userData.users?.username || 'Desconhecido'
+              username: usernameMap[userData.user_id] || 'Desconhecido'
             });
           }
         }
@@ -858,7 +918,28 @@ function App() {
               <ul>
                 <li><strong>🖨️ Imprimir</strong> - Gera versão para impressão</li>
                 <li><strong>📋 Copiar Faltantes</strong> - Copia lista de cromos em falta para partilhar no WhatsApp/SMS</li>
+                <li><strong>� Quem tem?</strong> - Encontra utilizadores com cromos que te faltam</li>
                 <li><strong>🗑️ Limpar</strong> - Apaga todos os dados (pede confirmação)</li>
+              </ul>
+            </div>
+
+            <div className="help-section">
+              <h3>🔍 Quem tem os meus cromos?</h3>
+              <ul>
+                <li>Mostra cromos que te faltam vs quem os tem repetidos</li>
+                <li><strong>Clica no username</strong> → abre mensagem direta</li>
+                <li><strong>Amarelo</strong> = já enviaste mensagem por esse cromo</li>
+                <li>Só funciona com conta (precisa saber quem és)</li>
+              </ul>
+            </div>
+
+            <div className="help-section">
+              <h3>💬 Mensagens</h3>
+              <ul>
+                <li><strong>💬 Botão</strong> ao lado do username - abre mensagens</li>
+                <li><strong>Badge vermelho</strong> = mensagens não lidas</li>
+                <li>Envia mensagens a outros utilizadores pelo username</li>
+                <li>Podes eliminar mensagens individualmente ou todas</li>
               </ul>
             </div>
 
@@ -899,7 +980,9 @@ function App() {
                 <li>✅ Funciona offline (depois de instalada)</li>
                 <li>✅ Guarda automaticamente no browser</li>
                 <li>✅ Sincroniza entre dispositivos (com conta)</li>
-                <li>✅ 980 cromos de 48 seleções + FIFA</li>
+                <li>✅ Sistema de mensagens entre utilizadores</li>
+                <li>✅ Encontra quem tem os cromos que te faltam</li>
+                <li>✅ 992 cromos de 48 seleções + FIFA + Coca-Cola</li>
               </ul>
             </div>
 
@@ -934,7 +1017,7 @@ function App() {
               />
               {messageError && <p className="error-text">{messageError}</p>}
               <button 
-                className="btn-copy" 
+                className="btn btn-send" 
                 onClick={sendDirectMessage} 
                 disabled={messageSending}
               >
@@ -949,7 +1032,14 @@ function App() {
 
             {/* Inbox */}
             <div className="message-inbox">
-              <h3>📥 Recebidas ({messages.length})</h3>
+              <div className="inbox-header">
+                <h3>📥 Recebidas ({messages.length})</h3>
+                {messages.length > 0 && (
+                  <button className="btn-delete-all" onClick={deleteAllMessages}>
+                    🗑️ Apagar todas
+                  </button>
+                )}
+              </div>
               {messages.length === 0 ? (
                 <p className="no-messages">Não tens mensagens</p>
               ) : (
@@ -960,6 +1050,13 @@ function App() {
                       className={`message-item ${!msg.read ? 'unread' : ''}`}
                       onClick={() => !msg.read && markAsRead(msg.id)}
                     >
+                      <button 
+                        className="btn-delete-msg" 
+                        onClick={(e) => { e.stopPropagation(); deleteMessage(msg.id); }}
+                        title="Eliminar"
+                      >
+                        ×
+                      </button>
                       <div className="message-header">
                         <span className="message-from">
                           👤 {msg.from_user?.username || 'Desconhecido'}
