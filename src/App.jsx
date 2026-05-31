@@ -1,7 +1,7 @@
 import './App.css';
 
 import { ALBUM_DATA, STICKER_STATUS, generateStickers, getTotalStickers } from './data/stickers';
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 
 import { supabase } from './lib/supabase';
 
@@ -21,6 +21,7 @@ function App() {
   const [showAuthForm, setShowAuthForm] = useState(false);
   const [copied, setCopied] = useState(false);
   const [showHelp, setShowHelp] = useState(false);
+  const isCloudLoaded = useRef(false); // Previne sync antes de carregar
   const [filter, setFilter] = useState(null); // null, 'falta', 'tenho', 'repetido'
   const [countryFilter, setCountryFilter] = useState(''); // filtro por país
 
@@ -71,8 +72,8 @@ function App() {
   // Guardar no localStorage sempre
   useEffect(() => {
     localStorage.setItem(STORAGE_KEY, JSON.stringify(stickerStates));
-    // Se estiver logado, sincronizar com Supabase
-    if (user) {
+    // Só sincroniza com Supabase se já carregou da cloud (evita sobrescrever)
+    if (user && isCloudLoaded.current) {
       syncToSupabase(stickerStates);
     }
   }, [stickerStates, user, syncToSupabase]);
@@ -80,12 +81,16 @@ function App() {
   // Carregar do Supabase quando faz login
   useEffect(() => {
     if (user) {
+      isCloudLoaded.current = false; // Reset ao mudar de user
       loadFromSupabase().then((data) => {
         if (data) {
           setStickerStates(data);
           localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
         }
+        isCloudLoaded.current = true; // Marca como carregado (mesmo se vazio)
       });
+    } else {
+      isCloudLoaded.current = false;
     }
   }, [user, loadFromSupabase]);
 
