@@ -1038,6 +1038,7 @@ function App() {
                       <div className="message-header">
                         <span className="message-from">
                           👤 {msg.from_user?.username || 'Desconhecido'}
+                          {!msg.read && <span className="new-badge">Nova</span>}
                         </span>
                         <span className="message-date">
                           {new Date(msg.created_at).toLocaleString('pt-PT', {
@@ -1049,7 +1050,6 @@ function App() {
                         </span>
                       </div>
                       <p className="message-text">{msg.message}</p>
-                      {!msg.read && <span className="new-badge">Nova</span>}
                     </div>
                   ))}
                 </div>
