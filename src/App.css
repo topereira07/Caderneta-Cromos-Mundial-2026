@@ -253,8 +253,12 @@ body {
   display: flex;
   justify-content: center;
   gap: 15px;
-  margin-bottom: 20px;
+  margin-bottom: 15px;
   flex-wrap: wrap;
+}
+
+.actions-secondary {
+  margin-bottom: 20px;
 }
 
 .btn {
@@ -1220,4 +1224,25 @@ body {
 .btn-delete-msg:hover {
   background: rgba(255, 82, 82, 0.6);
   color: #fff;
+}
+
+/* Export/Import buttons */
+.btn-export {
+  background: linear-gradient(135deg, #2196f3, #1976d2) !important;
+}
+
+.btn-export:hover {
+  background: linear-gradient(135deg, #1976d2, #1565c0) !important;
+}
+
+.btn-import {
+  background: linear-gradient(135deg, #ff9800, #f57c00) !important;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.btn-import:hover {
+  background: linear-gradient(135deg, #f57c00, #ef6c00) !important;
 }

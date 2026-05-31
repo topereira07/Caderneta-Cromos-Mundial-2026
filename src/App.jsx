@@ -585,6 +585,54 @@ function App() {
     }
   };
 
+  // Exportar dados para ficheiro JSON
+  const handleExport = () => {
+    const data = {
+      version: 1,
+      exportDate: new Date().toISOString(),
+      username: user?.username || 'local',
+      stickers: stickerStates
+    };
+    
+    const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `cromos-backup-${new Date().toISOString().split('T')[0]}.json`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+  };
+
+  // Importar dados de ficheiro JSON
+  const handleImport = (event) => {
+    const file = event.target.files?.[0];
+    if (!file) return;
+    
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      try {
+        const data = JSON.parse(e.target.result);
+        
+        if (!data.stickers || typeof data.stickers !== 'object') {
+          alert('Ficheiro inválido: não contém dados de cromos');
+          return;
+        }
+        
+        const numStickers = Object.keys(data.stickers).length;
+        if (window.confirm(`Importar ${numStickers} cromos de ${data.exportDate?.split('T')[0] || 'backup'}?\n\nIsso vai substituir os dados atuais.`)) {
+          setStickerStates(data.stickers);
+          alert('Dados importados com sucesso!');
+        }
+      } catch {
+        alert('Erro ao ler ficheiro. Verifica se é um backup válido.');
+      }
+    };
+    reader.readAsText(file);
+    event.target.value = ''; // Reset para permitir importar o mesmo ficheiro
+  };
+
   // Gerar texto com cromos em falta
   const generateMissingText = () => {
     const lines = ['🏆 FIFA World Cup 2026', 'Cromos em Falta', ''];
@@ -699,12 +747,19 @@ function App() {
               🔍 Quem tem?
             </button>
           )}
+          <button className="btn btn-help" onClick={() => setShowHelp(true)}>❓ Ajuda</button>
+        </div>
+        <div className="actions actions-secondary">
+          <button className="btn btn-export" onClick={handleExport}>💾 Exportar</button>
+          <label className="btn btn-import">
+            📂 Importar
+            <input type="file" accept=".json" onChange={handleImport} hidden />
+          </label>
           {backupStickers ? (
             <button className="btn btn-restore" onClick={handleRestore}>↩️ Restaurar</button>
           ) : (
             <button className="btn btn-reset" onClick={handleReset}>🗑️ Limpar</button>
           )}
-          <button className="btn btn-help" onClick={() => setShowHelp(true)}>❓ Ajuda</button>
         </div>
         <div className="legend">
           <button 
@@ -900,8 +955,10 @@ function App() {
               <ul>
                 <li><strong>🖨️ Imprimir</strong> - Gera versão para impressão</li>
                 <li><strong>📋 Copiar Faltantes</strong> - Copia lista de cromos em falta para partilhar no WhatsApp/SMS</li>
-                <li><strong>� Quem tem?</strong> - Encontra utilizadores com cromos que te faltam</li>
-                <li><strong>🗑️ Limpar</strong> - Apaga todos os dados (pede confirmação)</li>
+                <li><strong>🔍 Quem tem?</strong> - Encontra utilizadores com cromos que te faltam</li>
+                <li><strong>� Exportar</strong> - Guarda backup dos teus cromos em ficheiro</li>
+                <li><strong>📂 Importar</strong> - Restaura dados de um backup anterior</li>
+                <li><strong>�🗑️ Limpar</strong> - Apaga todos os dados (pede confirmação)</li>
               </ul>
             </div>
 
