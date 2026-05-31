@@ -56,16 +56,27 @@ function App() {
 
   const syncToSupabase = useCallback(async (stickers) => {
     if (!user) return;
+    // NUNCA sincronizar estados vazios - proteção contra perda de dados
+    if (!stickers || Object.keys(stickers).length === 0) {
+      console.log('[Sync] Ignorado - estado vazio');
+      return;
+    }
+    console.log('[Sync] Enviando', Object.keys(stickers).length, 'cromos para cloud');
     try {
-      await supabase
+      const { error } = await supabase
         .from('sticker_data')
         .upsert({ 
           user_id: user.id, 
           stickers: stickers,
           updated_at: new Date().toISOString()
         }, { onConflict: 'user_id' });
+      if (error) {
+        console.error('[Sync] Erro:', error);
+      } else {
+        console.log('[Sync] Sucesso!');
+      }
     } catch (err) {
-      console.error('Erro ao sincronizar:', err);
+      console.error('[Sync] Erro ao sincronizar:', err);
     }
   }, [user]);
 
@@ -82,10 +93,14 @@ function App() {
   useEffect(() => {
     if (user) {
       isCloudLoaded.current = false; // Reset ao mudar de user
+      console.log('[Load] Carregando do Supabase para user:', user.id);
       loadFromSupabase().then((data) => {
         if (data) {
+          console.log('[Load] Recebidos', Object.keys(data).length, 'cromos');
           setStickerStates(data);
           localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
+        } else {
+          console.log('[Load] Nenhum dado na cloud');
         }
         isCloudLoaded.current = true; // Marca como carregado (mesmo se vazio)
       });
