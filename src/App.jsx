@@ -37,6 +37,17 @@ function App() {
   const [messageError, setMessageError] = useState('');
   const [messageSending, setMessageSending] = useState(false);
 
+  // Estado para "Quem tem os meus cromos?"
+  const [showWhoHas, setShowWhoHas] = useState(false);
+  const [whoHasData, setWhoHasData] = useState([]); // [{sticker: 'POR1', users: [{id, username}]}]
+  const [whoHasLoading, setWhoHasLoading] = useState(false);
+  const [contactedUsers, setContactedUsers] = useState(() => {
+    // Formato: { 'POR1_userid': true, ... }
+    const saved = localStorage.getItem('cromos-contacted');
+    return saved ? JSON.parse(saved) : {};
+  });
+  const [directMessageSticker, setDirectMessageSticker] = useState(null); // Cromo para mensagem direta
+
   // Lista de todos os países para o dropdown
   const allCountries = ALBUM_DATA.flatMap(group => 
     group.teams.map(team => ({ code: team.code, name: team.name, flag: team.flag, group: group.group }))
@@ -273,6 +284,122 @@ function App() {
     } catch (err) {
       console.error('[Messages] Erro ao marcar como lida:', err);
     }
+  };
+
+  // Buscar utilizadores que têm os cromos que me faltam como repetidos
+  const findWhoHasMyMissing = async () => {
+    if (!user) return;
+    
+    setWhoHasLoading(true);
+    setShowWhoHas(true);
+    
+    try {
+      // Encontrar os cromos que me faltam
+      const myMissing = Object.entries(stickerStates)
+        .filter(([, status]) => status === STICKER_STATUS.NONE)
+        .map(([code]) => code);
+      
+      if (myMissing.length === 0) {
+        setWhoHasData([]);
+        setWhoHasLoading(false);
+        return;
+      }
+      
+      // Buscar todos os utilizadores e os seus cromos
+      const { data: allUsers, error } = await supabase
+        .from('sticker_data')
+        .select('user_id, stickers, users(username)')
+        .neq('user_id', user.id);
+      
+      if (error) {
+        console.error('[WhoHas] Erro:', error);
+        setWhoHasLoading(false);
+        return;
+      }
+      
+      // Para cada cromo que me falta, encontrar quem o tem repetido
+      const results = [];
+      
+      for (const stickerCode of myMissing) {
+        const usersWithDuplicate = [];
+        
+        for (const userData of allUsers || []) {
+          const userStickers = userData.stickers || {};
+          if (userStickers[stickerCode] === STICKER_STATUS.DUPLICATE) {
+            usersWithDuplicate.push({
+              id: userData.user_id,
+              username: userData.users?.username || 'Desconhecido'
+            });
+          }
+        }
+        
+        if (usersWithDuplicate.length > 0) {
+          results.push({
+            sticker: stickerCode,
+            users: usersWithDuplicate
+          });
+        }
+      }
+      
+      // Ordenar por número de utilizadores (mais matches primeiro)
+      results.sort((a, b) => b.users.length - a.users.length);
+      
+      setWhoHasData(results);
+    } catch (err) {
+      console.error('[WhoHas] Erro:', err);
+    }
+    
+    setWhoHasLoading(false);
+  };
+
+  // Marcar utilizador como contactado para um cromo específico
+  const markAsContacted = (stickerCode, targetUserId) => {
+    const key = `${stickerCode}_${targetUserId}`;
+    const updated = { ...contactedUsers, [key]: true };
+    setContactedUsers(updated);
+    localStorage.setItem('cromos-contacted', JSON.stringify(updated));
+  };
+
+  // Verificar se já contactámos este utilizador para este cromo
+  const isContacted = (stickerCode, targetUserId) => {
+    return contactedUsers[`${stickerCode}_${targetUserId}`] === true;
+  };
+
+  // Abrir mensagem direta para um cromo específico
+  const openDirectMessage = (stickerCode, targetUser) => {
+    setDirectMessageSticker(stickerCode);
+    setNewMessageTo(targetUser.username);
+    setNewMessageText(`Olá! Vi que tens o cromo ${stickerCode} repetido. Podemos trocar?`);
+    setShowWhoHas(false);
+    setShowMessages(true);
+  };
+
+  // Enviar mensagem e marcar como contactado
+  const sendDirectMessage = async () => {
+    if (!directMessageSticker) {
+      // Mensagem normal
+      await sendMessage();
+      return;
+    }
+    
+    // Mensagem de troca de cromos
+    const targetUsername = newMessageTo.toLowerCase().trim();
+    
+    // Buscar ID do utilizador
+    const { data: targetUser } = await supabase
+      .from('users')
+      .select('id')
+      .eq('username', targetUsername)
+      .single();
+    
+    if (targetUser) {
+      await sendMessage();
+      markAsContacted(directMessageSticker, targetUser.id);
+    } else {
+      await sendMessage();
+    }
+    
+    setDirectMessageSticker(null);
   };
 
   // Login
@@ -525,6 +652,11 @@ function App() {
           <button className="btn btn-copy" onClick={handleCopyMissing}>
             {copied ? '✅ Copiado!' : '📋 Copiar Faltantes'}
           </button>
+          {user && (
+            <button className="btn btn-whohas" onClick={findWhoHasMyMissing}>
+              🔍 Quem tem?
+            </button>
+          )}
           {backupStickers ? (
             <button className="btn btn-restore" onClick={handleRestore}>↩️ Restaurar</button>
           ) : (
@@ -645,6 +777,55 @@ function App() {
         <p className="signature">made by Maria Leonor Pereira ⚽</p>
       </footer>
 
+      {/* Modal "Quem tem os meus cromos?" */}
+      {showWhoHas && (
+        <div className="modal-overlay" onClick={() => setShowWhoHas(false)}>
+          <div className="modal-content whohas-modal" onClick={(e) => e.stopPropagation()}>
+            <button className="modal-close" onClick={() => setShowWhoHas(false)}>×</button>
+            <h2>🔍 Quem tem os meus cromos?</h2>
+            
+            {whoHasLoading ? (
+              <div className="loading-spinner">
+                <p>🔄 A procurar...</p>
+              </div>
+            ) : whoHasData.length === 0 ? (
+              <div className="no-results">
+                <p>😕 Nenhum utilizador tem os cromos que te faltam como repetidos.</p>
+                <p className="hint">Tenta mais tarde - outros utilizadores podem adicionar cromos!</p>
+              </div>
+            ) : (
+              <div className="whohas-results">
+                <p className="results-summary">
+                  🎯 Encontrados <strong>{whoHasData.length}</strong> cromos com matches!
+                </p>
+                <div className="whohas-list">
+                  {whoHasData.map(({ sticker, users }) => (
+                    <div key={sticker} className="whohas-item">
+                      <div className="whohas-sticker">
+                        <span className="sticker-code">{sticker}</span>
+                        <span className="user-count">({users.length} {users.length === 1 ? 'pessoa' : 'pessoas'})</span>
+                      </div>
+                      <div className="whohas-users">
+                        {users.map(targetUser => (
+                          <button
+                            key={targetUser.id}
+                            className={`user-chip ${isContacted(sticker, targetUser.id) ? 'contacted' : ''}`}
+                            onClick={() => openDirectMessage(sticker, targetUser)}
+                          >
+                            👤 {targetUser.username}
+                            {isContacted(sticker, targetUser.id) && <span className="contacted-badge">✉️</span>}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+
       {/* Modal de Ajuda */}
       {showHelp && (
         <div className="modal-overlay" onClick={() => setShowHelp(false)}>
@@ -754,11 +935,16 @@ function App() {
               {messageError && <p className="error-text">{messageError}</p>}
               <button 
                 className="btn-copy" 
-                onClick={sendMessage} 
+                onClick={sendDirectMessage} 
                 disabled={messageSending}
               >
                 {messageSending ? 'A enviar...' : '📤 Enviar'}
               </button>
+              {directMessageSticker && (
+                <p className="direct-message-hint">
+                  📌 A pedir cromo <strong>{directMessageSticker}</strong>
+                </p>
+              )}
             </div>
 
             {/* Inbox */}
