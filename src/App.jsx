@@ -93,28 +93,42 @@ function App() {
   // Guardar no localStorage sempre
   useEffect(() => {
     localStorage.setItem(STORAGE_KEY, JSON.stringify(stickerStates));
-    // Só sincroniza com Supabase se já carregou da cloud (evita sobrescrever)
-    if (user && isCloudLoaded.current) {
+    
+    // Debug: mostrar estado atual
+    const numStickers = Object.keys(stickerStates).length;
+    console.log(`[Effect] stickerStates mudou: ${numStickers} cromos, user: ${user?.id || 'null'}, cloudLoaded: ${isCloudLoaded.current}`);
+    
+    // Só sincroniza se:
+    // 1. Tem user logado
+    // 2. Já carregou da cloud
+    // 3. Tem cromos para sincronizar (proteção contra sobrescrever com vazio)
+    if (user && isCloudLoaded.current && numStickers > 0) {
+      console.log('[Effect] -> Vai sincronizar');
       syncToSupabase(stickerStates);
+    } else {
+      console.log('[Effect] -> NÃO sincroniza:', !user ? 'sem user' : !isCloudLoaded.current ? 'cloud não carregada' : 'sem cromos');
     }
   }, [stickerStates, user, syncToSupabase]);
 
   // Carregar do Supabase quando faz login
   useEffect(() => {
     if (user) {
-      isCloudLoaded.current = false; // Reset ao mudar de user
-      console.log('[Load] Carregando do Supabase para user:', user.id);
+      console.log('[UserEffect] User mudou, resetando cloudLoaded para false');
+      isCloudLoaded.current = false; // Reset PRIMEIRO
+      console.log('[UserEffect] Carregando do Supabase para user:', user.id);
       loadFromSupabase().then((data) => {
         if (data) {
-          console.log('[Load] Recebidos', Object.keys(data).length, 'cromos');
+          console.log('[UserEffect] Recebidos', Object.keys(data).length, 'cromos - atualizando state');
           setStickerStates(data);
           localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
         } else {
-          console.log('[Load] Nenhum dado na cloud');
+          console.log('[UserEffect] Nenhum dado na cloud');
         }
-        isCloudLoaded.current = true; // Marca como carregado (mesmo se vazio)
+        console.log('[UserEffect] Marcando cloudLoaded = true');
+        isCloudLoaded.current = true;
       });
     } else {
+      console.log('[UserEffect] User é null, resetando cloudLoaded');
       isCloudLoaded.current = false;
     }
   }, [user, loadFromSupabase]);
@@ -141,6 +155,10 @@ function App() {
       return;
     }
 
+    // IMPORTANTE: Desativar sync ANTES de mudar o user
+    console.log('[Login] Desativando sync antes de setUser');
+    isCloudLoaded.current = false;
+    
     setUser(userData);
     localStorage.setItem(LOCAL_USER_KEY, JSON.stringify(userData));
     setUsername('');
