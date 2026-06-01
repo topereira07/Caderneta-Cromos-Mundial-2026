@@ -960,7 +960,7 @@ function App() {
                 <li><strong>🖨️ Imprimir</strong> - Gera versão para impressão</li>
                 <li><strong>📋 Copiar Faltantes</strong> - Copia lista de cromos em falta para partilhar no WhatsApp/SMS</li>
                 <li><strong>🔍 Quem tem?</strong> - Encontra utilizadores com cromos que te faltam</li>
-                <li><strong>� Exportar</strong> - Guarda backup dos teus cromos em ficheiro</li>
+                <li><strong>💾 Exportar</strong> - Guarda backup dos teus cromos em ficheiro</li>
                 <li><strong>📂 Importar</strong> - Restaura dados de um backup anterior</li>
                 <li><strong>�🗑️ Limpar</strong> - Apaga todos os dados (pede confirmação)</li>
               </ul>
