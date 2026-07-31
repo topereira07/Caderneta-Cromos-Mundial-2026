@@ -208,6 +208,26 @@ body {
   text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.3);
 }
 
+.collection-switch {
+  display: flex;
+  justify-content: center;
+  gap: 10px;
+  margin-bottom: 15px;
+  flex-wrap: wrap;
+}
+
+.btn-collection {
+  background: rgba(255, 255, 255, 0.15);
+  border: 2px solid rgba(255, 255, 255, 0.2);
+  color: #fff;
+  padding: 10px 18px;
+}
+
+.btn-collection.active {
+  background: linear-gradient(135deg, #00acc1, #007c91);
+  border-color: rgba(255, 255, 255, 0.45);
+}
+
 /* Stats */
 .stats {
   display: flex;
@@ -476,6 +496,51 @@ body {
 .team-percentage.complete {
   background: linear-gradient(135deg, #00c853, #009624);
   color: #fff;
+}
+
+.extra-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 12px;
+}
+
+.extra-card {
+  background: rgba(255, 255, 255, 0.08);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 10px;
+  padding: 10px;
+}
+
+.extra-header {
+  min-width: auto;
+  width: 100%;
+  margin-bottom: 8px;
+}
+
+.extra-team {
+  font-size: 0.75rem;
+  opacity: 0.8;
+}
+
+.extra-sticker {
+  min-width: 44px;
+  width: 44px;
+}
+
+.extra-sticker.rarity-lilas {
+  border-color: #ce93d8;
+}
+
+.extra-sticker.rarity-bronze {
+  border-color: #b87333;
+}
+
+.extra-sticker.rarity-prata {
+  border-color: #c0c0c0;
+}
+
+.extra-sticker.rarity-ouro {
+  border-color: #f9a825;
 }
 
 /* Stickers */

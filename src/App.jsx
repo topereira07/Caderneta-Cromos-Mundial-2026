@@ -2,12 +2,18 @@
 import './App.css';
 
 import { ALBUM_DATA, STICKER_STATUS, generateStickers, getTotalStickers } from './data/stickers';
+import { getAllExtraStickerCodes, getExtraStickerGroups, getTotalExtraStickers } from './data/extraStickers';
 import { useCallback, useEffect, useRef, useState } from 'react';
 
 import { supabase } from './lib/supabase';
 
 const STORAGE_KEY = 'cromos-fifa-2026';
+const EXTRA_STORAGE_KEY = 'cromos-fifa-2026-extra';
 const LOCAL_USER_KEY = 'cromos-user';
+const COLLECTIONS = {
+  NORMAL: 'normal',
+  EXTRA: 'extra',
+};
 
 function App() {
   // Auth state
@@ -22,11 +28,15 @@ function App() {
   const [showAuthForm, setShowAuthForm] = useState(false);
   const [copied, setCopied] = useState(false);
   const [showHelp, setShowHelp] = useState(false);
-  const [backupStickers, setBackupStickers] = useState(null); // Para restaurar após limpar
+  const [backupStickers, setBackupStickers] = useState(null); // { collection, stickers }
   const isCloudLoaded = useRef(false); // Previne sync antes de carregar
-  const userClearedData = useRef(false); // Flag para permitir sync de dados vazios após limpar
+  const userClearedData = useRef({
+    [COLLECTIONS.NORMAL]: false,
+    [COLLECTIONS.EXTRA]: false,
+  }); // Flag para permitir sync de dados vazios após limpar
   const [filter, setFilter] = useState(null); // null, 'falta', 'tenho', 'repetido'
   const [countryFilter, setCountryFilter] = useState(''); // filtro por país
+  const [activeCollection, setActiveCollection] = useState(COLLECTIONS.NORMAL);
 
   // Estado de mensagens
   const [showMessages, setShowMessages] = useState(false);
@@ -58,23 +68,41 @@ function App() {
     const saved = localStorage.getItem(STORAGE_KEY);
     return saved ? JSON.parse(saved) : {};
   });
+  const [extraStickerStates, setExtraStickerStates] = useState(() => {
+    const saved = localStorage.getItem(EXTRA_STORAGE_KEY);
+    return saved ? JSON.parse(saved) : {};
+  });
 
   const loadFromSupabase = useCallback(async () => {
     if (!user) return null;
     try {
-      const { data, error } = await supabase
+      let data = null;
+      let error = null;
+
+      ({ data, error } = await supabase
         .from('sticker_data')
-        .select('stickers')
+        .select('stickers, stickers_extra')
         .eq('user_id', user.id)
-        .single();
+        .single());
+
+      if (error?.code === '42703') {
+        ({ data, error } = await supabase
+          .from('sticker_data')
+          .select('stickers')
+          .eq('user_id', user.id)
+          .single());
+      }
 
       if (error) {
         console.error('[Load] ERRO Supabase:', error.message, error.code, error.details);
         return null;
       }
 
-      if (data?.stickers && Object.keys(data.stickers).length > 0) {
-        return data.stickers;
+      if (data) {
+        return {
+          stickers: data.stickers || {},
+          stickersExtra: data.stickers_extra || {},
+        };
       }
     } catch (err) {
       console.error('[Load] ERRO catch:', err);
@@ -82,17 +110,31 @@ function App() {
     return null;
   }, [user]);
 
-  const syncToSupabase = useCallback(async (stickers) => {
+  const syncToSupabase = useCallback(async (stickers, stickersExtra) => {
     if (!user) return;
     try {
-      const { error } = await supabase
+      let error = null;
+
+      ({ error } = await supabase
         .from('sticker_data')
-        .upsert({ 
-          user_id: user.id, 
+        .upsert({
+          user_id: user.id,
           stickers: stickers || {},
-          updated_at: new Date().toISOString()
+          stickers_extra: stickersExtra || {},
+          updated_at: new Date().toISOString(),
         }, { onConflict: 'user_id' })
-        .select();
+        .select());
+
+      if (error?.code === '42703') {
+        ({ error } = await supabase
+          .from('sticker_data')
+          .upsert({
+            user_id: user.id,
+            stickers: stickers || {},
+            updated_at: new Date().toISOString(),
+          }, { onConflict: 'user_id' })
+          .select());
+      }
       
       if (error) {
         console.error('[Sync] ERRO:', error.message);
@@ -105,31 +147,44 @@ function App() {
   // Guardar no localStorage sempre
   useEffect(() => {
     localStorage.setItem(STORAGE_KEY, JSON.stringify(stickerStates));
+    localStorage.setItem(EXTRA_STORAGE_KEY, JSON.stringify(extraStickerStates));
     
     const numStickers = Object.keys(stickerStates).length;
+    const numExtraStickers = Object.keys(extraStickerStates).length;
     
     // Só sincroniza se:
     // 1. Tem user logado
     // 2. Já carregou da cloud
     // 3. Tem cromos OU o utilizador limpou intencionalmente (com confirmação)
-    if (user && isCloudLoaded.current && numStickers > 0) {
-      syncToSupabase(stickerStates);
-    } else if (user && isCloudLoaded.current && numStickers === 0 && userClearedData.current) {
+    if (user && isCloudLoaded.current && (numStickers > 0 || numExtraStickers > 0)) {
+      syncToSupabase(stickerStates, extraStickerStates);
+    } else if (
+      user &&
+      isCloudLoaded.current &&
+      numStickers === 0 &&
+      numExtraStickers === 0 &&
+      (userClearedData.current[COLLECTIONS.NORMAL] || userClearedData.current[COLLECTIONS.EXTRA])
+    ) {
       // Só envia vazio se o user EXPLICITAMENTE limpou
-      syncToSupabase(stickerStates);
-      userClearedData.current = false;
+      syncToSupabase(stickerStates, extraStickerStates);
+      userClearedData.current[COLLECTIONS.NORMAL] = false;
+      userClearedData.current[COLLECTIONS.EXTRA] = false;
     }
     // Se numStickers === 0 e NÃO foi o user que limpou, NÃO sincroniza (protege dados na cloud)
-  }, [stickerStates, user, syncToSupabase]);
+  }, [stickerStates, extraStickerStates, user, syncToSupabase]);
 
   // Carregar do Supabase quando faz login
   useEffect(() => {
     if (user) {
       isCloudLoaded.current = false;
       loadFromSupabase().then((data) => {
-        if (data) {
-          setStickerStates(data);
-          localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
+        if (data?.stickers) {
+          setStickerStates(data.stickers);
+          localStorage.setItem(STORAGE_KEY, JSON.stringify(data.stickers));
+        }
+        if (data?.stickersExtra) {
+          setExtraStickerStates(data.stickersExtra);
+          localStorage.setItem(EXTRA_STORAGE_KEY, JSON.stringify(data.stickersExtra));
         }
         isCloudLoaded.current = true;
       });
@@ -316,18 +371,16 @@ function App() {
     setShowWhoHas(true);
     
     try {
-      // Gerar lista de TODOS os códigos de cromos
-      const allStickers = [];
-      ALBUM_DATA.forEach(group => {
-        group.teams.forEach(team => {
-          const teamStickers = generateStickers(team);
-          allStickers.push(...teamStickers);
-        });
-      });
+      const isExtraCollection = activeCollection === COLLECTIONS.EXTRA;
+      const allStickers = isExtraCollection
+        ? getAllExtraStickerCodes()
+        : ALBUM_DATA.flatMap(group => group.teams.flatMap(team => generateStickers(team)));
+      const sourceField = isExtraCollection ? 'stickers_extra' : 'stickers';
+      const currentStates = isExtraCollection ? extraStickerStates : stickerStates;
       
       // Encontrar os cromos que me faltam (não existem no objeto OU status === 0)
       const myMissing = allStickers.filter(code => {
-        const status = stickerStates[code];
+        const status = currentStates[code];
         return status === undefined || status === STICKER_STATUS.NONE;
       });
       
@@ -338,10 +391,27 @@ function App() {
       }
       
       // Buscar todos os utilizadores e os seus cromos
-      const { data: allUsers, error } = await supabase
+      let allUsers = null;
+      let error = null;
+
+      ({ data: allUsers, error } = await supabase
         .from('sticker_data')
-        .select('user_id, stickers')
-        .neq('user_id', user.id);
+        .select('user_id, stickers, stickers_extra')
+        .neq('user_id', user.id));
+
+      if (error?.code === '42703') {
+        ({ data: allUsers, error } = await supabase
+          .from('sticker_data')
+          .select('user_id, stickers')
+          .neq('user_id', user.id));
+
+        if (isExtraCollection) {
+          alert('Para usar "Quem tem?" nos Extra Stickers, aplica primeiro a migração stickers_extra na base de dados.');
+          setWhoHasData([]);
+          setWhoHasLoading(false);
+          return;
+        }
+      }
       
       if (error) {
         console.error('[WhoHas] Erro:', error);
@@ -368,7 +438,7 @@ function App() {
         const usersWithDuplicate = [];
         
         for (const userData of allUsers || []) {
-          const userStickers = userData.stickers || {};
+          const userStickers = userData[sourceField] || {};
           if (userStickers[stickerCode] === STICKER_STATUS.DUPLICATE) {
             usersWithDuplicate.push({
               id: userData.user_id,
@@ -380,7 +450,8 @@ function App() {
         if (usersWithDuplicate.length > 0) {
           results.push({
             sticker: stickerCode,
-            users: usersWithDuplicate
+            users: usersWithDuplicate,
+            collection: activeCollection,
           });
         }
       }
@@ -397,23 +468,24 @@ function App() {
   };
 
   // Marcar utilizador como contactado para um cromo específico
-  const markAsContacted = (stickerCode, targetUserId) => {
-    const key = `${stickerCode}_${targetUserId}`;
+  const markAsContacted = (stickerCode, targetUserId, collection) => {
+    const key = `${collection}_${stickerCode}_${targetUserId}`;
     const updated = { ...contactedUsers, [key]: true };
     setContactedUsers(updated);
     localStorage.setItem('cromos-contacted', JSON.stringify(updated));
   };
 
   // Verificar se já contactámos este utilizador para este cromo
-  const isContacted = (stickerCode, targetUserId) => {
-    return contactedUsers[`${stickerCode}_${targetUserId}`] === true;
+  const isContacted = (stickerCode, targetUserId, collection) => {
+    return contactedUsers[`${collection}_${stickerCode}_${targetUserId}`] === true;
   };
 
   // Abrir mensagem direta para um cromo específico
   const openDirectMessage = (stickerCode, targetUser) => {
     setDirectMessageSticker(stickerCode);
     setNewMessageTo(targetUser.username);
-    setNewMessageText(`Olá! Vi que tens o cromo ${stickerCode} repetido. Podemos trocar?`);
+    const collectionLabel = activeCollection === COLLECTIONS.EXTRA ? 'Extra Stickers' : 'Coleção Normal';
+    setNewMessageText(`Olá! Vi que tens o cromo ${stickerCode} repetido (${collectionLabel}). Podemos trocar?`);
     setShowWhoHas(false);
     setShowMessages(true);
   };
@@ -438,7 +510,7 @@ function App() {
     
     if (targetUser) {
       await sendMessage();
-      markAsContacted(directMessageSticker, targetUser.id);
+      markAsContacted(directMessageSticker, targetUser.id, activeCollection);
     } else {
       await sendMessage();
     }
@@ -515,9 +587,15 @@ function App() {
     }
 
     // Criar entrada de stickers com dados atuais
-    await supabase
+    const { error: insertError } = await supabase
       .from('sticker_data')
-      .insert([{ user_id: newUser.id, stickers: stickerStates }]);
+      .insert([{ user_id: newUser.id, stickers: stickerStates, stickers_extra: extraStickerStates }]);
+
+    if (insertError?.code === '42703') {
+      await supabase
+        .from('sticker_data')
+        .insert([{ user_id: newUser.id, stickers: stickerStates }]);
+    }
 
     setUser(newUser);
     localStorage.setItem(LOCAL_USER_KEY, JSON.stringify(newUser));
@@ -533,13 +611,15 @@ function App() {
     isCloudLoaded.current = false;
     setUser(null);
     setStickerStates({});
+    setExtraStickerStates({});
     localStorage.removeItem(LOCAL_USER_KEY);
     localStorage.removeItem(STORAGE_KEY);
+    localStorage.removeItem(EXTRA_STORAGE_KEY);
   };
 
   // Handler de clique num sticker
   const handleStickerClick = useCallback((stickerId) => {
-    setStickerStates((prev) => {
+    const updateStates = (prev) => {
       const currentStatus = prev[stickerId] || STICKER_STATUS.NONE;
       const nextStatus = (currentStatus + 1) % 3;
       
@@ -550,11 +630,22 @@ function App() {
       }
       
       return { ...prev, [stickerId]: nextStatus };
-    });
-  }, []);
+    };
+
+    if (activeCollection === COLLECTIONS.EXTRA) {
+      setExtraStickerStates(updateStates);
+      return;
+    }
+
+    setStickerStates(updateStates);
+  }, [activeCollection]);
+
+  const currentCollectionStates = activeCollection === COLLECTIONS.EXTRA ? extraStickerStates : stickerStates;
+  const currentCollectionName = activeCollection === COLLECTIONS.EXTRA ? 'coleção Extra Stickers' : 'caderneta principal';
+  const extraStickerGroups = getExtraStickerGroups();
 
   // Calcular contadores
-  const counts = Object.values(stickerStates).reduce(
+  const counts = Object.values(currentCollectionStates).reduce(
     (acc, status) => {
       if (status === STICKER_STATUS.OWNED) acc.owned++;
       else if (status === STICKER_STATUS.DUPLICATE) { acc.owned++; acc.duplicates++; }
@@ -563,24 +654,32 @@ function App() {
     { owned: 0, duplicates: 0 }
   );
 
-  const totalStickers = getTotalStickers();
+  const totalStickers = activeCollection === COLLECTIONS.EXTRA ? getTotalExtraStickers() : getTotalStickers();
   const percentage = totalStickers > 0 ? Math.round((counts.owned / totalStickers) * 100) : 0;
 
   const handlePrint = () => window.print();
   
   const handleReset = () => {
-    if (Object.keys(stickerStates).length === 0) return;
-    if (window.confirm('Tens a certeza que queres limpar toda a caderneta?')) {
-      setBackupStickers(stickerStates); // Guardar backup antes de limpar
-      userClearedData.current = true; // Permitir sync de dados vazios
-      setStickerStates({});
+    if (Object.keys(currentCollectionStates).length === 0) return;
+    if (window.confirm(`Tens a certeza que queres limpar toda a ${currentCollectionName}?`)) {
+      setBackupStickers({ collection: activeCollection, stickers: currentCollectionStates }); // Guardar backup antes de limpar
+      userClearedData.current[activeCollection] = true; // Permitir sync de dados vazios
+      if (activeCollection === COLLECTIONS.EXTRA) {
+        setExtraStickerStates({});
+      } else {
+        setStickerStates({});
+      }
     }
   };
 
   const handleRestore = () => {
-    if (backupStickers && Object.keys(backupStickers).length > 0) {
-      userClearedData.current = false; // Cancelar a flag de limpeza
-      setStickerStates(backupStickers);
+    if (backupStickers?.stickers && Object.keys(backupStickers.stickers).length > 0) {
+      userClearedData.current[backupStickers.collection] = false; // Cancelar a flag de limpeza
+      if (backupStickers.collection === COLLECTIONS.EXTRA) {
+        setExtraStickerStates(backupStickers.stickers);
+      } else {
+        setStickerStates(backupStickers.stickers);
+      }
       setBackupStickers(null);
     }
   };
@@ -588,10 +687,11 @@ function App() {
   // Exportar dados para ficheiro JSON
   const handleExport = () => {
     const data = {
-      version: 1,
+      version: 2,
       exportDate: new Date().toISOString(),
       username: user?.username || 'local',
-      stickers: stickerStates
+      stickers: stickerStates,
+      stickersExtra: extraStickerStates,
     };
     
     const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
@@ -620,9 +720,11 @@ function App() {
           return;
         }
         
-        const numStickers = Object.keys(data.stickers).length;
-        if (window.confirm(`Importar ${numStickers} cromos de ${data.exportDate?.split('T')[0] || 'backup'}?\n\nIsso vai substituir os dados atuais.`)) {
+        const numStickers = Object.keys(data.stickers || {}).length;
+        const numExtraStickers = Object.keys(data.stickersExtra || {}).length;
+        if (window.confirm(`Importar ${numStickers} cromos normais e ${numExtraStickers} extra de ${data.exportDate?.split('T')[0] || 'backup'}?\n\nIsso vai substituir os dados atuais.`)) {
           setStickerStates(data.stickers);
+          setExtraStickerStates(data.stickersExtra || {});
           alert('Dados importados com sucesso!');
         }
       } catch {
@@ -635,6 +737,30 @@ function App() {
 
   // Gerar texto com cromos em falta
   const generateMissingText = () => {
+    if (activeCollection === COLLECTIONS.EXTRA) {
+      const lines = ['✨ FIFA World Cup 2026', 'Extra Stickers em Falta', ''];
+      let totalMissing = 0;
+
+      extraStickerGroups.forEach(({ player, stickers }) => {
+        const missingVariants = stickers.filter((variant) => {
+          const status = extraStickerStates[variant.id];
+          return status === undefined || status === STICKER_STATUS.NONE;
+        });
+
+        if (missingVariants.length > 0) {
+          lines.push(`${player.code} ${player.name}: ${missingVariants.map((variant) => variant.rarityLabel).join(', ')}`);
+          totalMissing += missingVariants.length;
+        }
+      });
+
+      lines.push('');
+      lines.push(`Total: ${totalMissing} extra stickers em falta`);
+      lines.push('');
+      lines.push('📱 cadernetacromosmundial2026.org');
+
+      return lines.join('\n');
+    }
+
     const lines = ['🏆 FIFA World Cup 2026', 'Cromos em Falta', ''];
     let totalMissing = 0;
     
@@ -723,10 +849,24 @@ function App() {
         </div>
 
         <h1>🏆 Caderneta FIFA World Cup 2026</h1>
+        <div className="collection-switch">
+          <button
+            className={`btn btn-collection ${activeCollection === COLLECTIONS.NORMAL ? 'active' : ''}`}
+            onClick={() => setActiveCollection(COLLECTIONS.NORMAL)}
+          >
+            🌍 Coleção Normal
+          </button>
+          <button
+            className={`btn btn-collection ${activeCollection === COLLECTIONS.EXTRA ? 'active' : ''}`}
+            onClick={() => setActiveCollection(COLLECTIONS.EXTRA)}
+          >
+            ✨ Extra Stickers
+          </button>
+        </div>
         <div className="stats">
           <div className="stat-item owned">
             <span className="stat-value">{counts.owned}</span>
-            <span className="stat-label">Cromos</span>
+            <span className="stat-label">{activeCollection === COLLECTIONS.EXTRA ? 'Extras' : 'Cromos'}</span>
           </div>
           <div className="stat-item progress">
             <span className="stat-value">{percentage}%</span>
@@ -785,6 +925,7 @@ function App() {
             <span className="legend-box duplicate"></span> Repetido
           </button>
         </div>
+        {activeCollection === COLLECTIONS.NORMAL && (
         <div className="country-filter">
           <select 
             value={countryFilter} 
@@ -799,6 +940,7 @@ function App() {
             ))}
           </select>
         </div>
+        )}
       </header>
 
       <div className="print-header print-only">
@@ -807,7 +949,7 @@ function App() {
       </div>
 
       <main className="album">
-        {ALBUM_DATA.map((groupData) => {
+        {activeCollection === COLLECTIONS.NORMAL ? ALBUM_DATA.map((groupData) => {
           // Filtrar equipas por país se selecionado
           const filteredTeams = countryFilter 
             ? groupData.teams.filter(team => team.code === countryFilter)
@@ -871,7 +1013,59 @@ function App() {
             </div>
           </section>
         );
-        })}
+        }) : (
+          <section className="group extra-group">
+            <h2 className="group-title">✨ Extra Stickers (20 jogadores x 4 raridades)</h2>
+            <div className="extra-grid">
+              {extraStickerGroups.map(({ player, stickers }) => {
+                const ownedCount = stickers.filter(
+                  (item) => currentCollectionStates[item.id] === STICKER_STATUS.OWNED || currentCollectionStates[item.id] === STICKER_STATUS.DUPLICATE
+                ).length;
+                const playerPercentage = Math.round((ownedCount / stickers.length) * 100);
+
+                return (
+                  <div key={player.code} className="extra-card">
+                    <div className="team-header extra-header">
+                      <span className="team-name">{player.code} {player.name}</span>
+                      <span className="extra-team">{player.team}</span>
+                      <span className={`team-percentage ${playerPercentage === 100 ? 'complete' : ''}`}>
+                        {playerPercentage}%
+                      </span>
+                    </div>
+                    <div className="stickers">
+                      {stickers
+                        .filter((item) => {
+                          const status = currentCollectionStates[item.id] || STICKER_STATUS.NONE;
+                          if (!filter) return true;
+                          if (filter === 'falta') return status === STICKER_STATUS.NONE;
+                          if (filter === 'tenho') return status === STICKER_STATUS.OWNED || status === STICKER_STATUS.DUPLICATE;
+                          if (filter === 'repetido') return status === STICKER_STATUS.DUPLICATE;
+                          return true;
+                        })
+                        .map((item) => {
+                          const status = currentCollectionStates[item.id] || STICKER_STATUS.NONE;
+                          const displayClass = filter === 'tenho' && status === STICKER_STATUS.DUPLICATE
+                            ? 'owned'
+                            : status === STICKER_STATUS.OWNED ? 'owned'
+                            : status === STICKER_STATUS.DUPLICATE ? 'duplicate' : '';
+                          return (
+                            <button
+                              key={item.id}
+                              className={`sticker extra-sticker ${item.rarityClassName} ${displayClass}`}
+                              onClick={() => handleStickerClick(item.id)}
+                              title={`${item.id} - ${item.rarityLabel} - Clica para alternar estado`}
+                            >
+                              {item.rarityShortLabel}
+                            </button>
+                          );
+                        })}
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          </section>
+        )}
       </main>
 
       <footer className="footer no-print">
@@ -900,7 +1094,7 @@ function App() {
                   🎯 Encontrados <strong>{whoHasData.length}</strong> cromos com matches!
                 </p>
                 <div className="whohas-list">
-                  {whoHasData.map(({ sticker, users }) => (
+                  {whoHasData.map(({ sticker, users, collection }) => (
                     <div key={sticker} className="whohas-item">
                       <div className="whohas-sticker">
                         <span className="sticker-code">{sticker}</span>
@@ -910,11 +1104,11 @@ function App() {
                         {users.map(targetUser => (
                           <button
                             key={targetUser.id}
-                            className={`user-chip ${isContacted(sticker, targetUser.id) ? 'contacted' : ''}`}
+                            className={`user-chip ${isContacted(sticker, targetUser.id, collection) ? 'contacted' : ''}`}
                             onClick={() => openDirectMessage(sticker, targetUser)}
                           >
                             👤 {targetUser.username}
-                            {isContacted(sticker, targetUser.id) && <span className="contacted-badge">✉️</span>}
+                            {isContacted(sticker, targetUser.id, collection) && <span className="contacted-badge">✉️</span>}
                           </button>
                         ))}
                       </div>
@@ -950,7 +1144,17 @@ function App() {
                 <li><strong>Falta</strong> - Mostra apenas os cromos em falta</li>
                 <li><strong>Tenho</strong> - Mostra apenas os que já tens</li>
                 <li><strong>Repetido</strong> - Mostra apenas os repetidos</li>
-                <li><strong>Dropdown países</strong> - Filtra por seleção/país</li>
+                <li><strong>Dropdown países</strong> - Filtra por seleção/país (só na coleção normal)</li>
+              </ul>
+            </div>
+
+            <div className="help-section">
+              <h3>✨ Extra Stickers</h3>
+              <ul>
+                <li><strong>Botão Extra Stickers</strong> - Troca para coleção especial</li>
+                <li>20 jogadores com 4 variantes (Lilás, Bronze, Prata, Ouro)</li>
+                <li>Total: 80 cromos extra</li>
+                <li>Mesma lógica de clique: falta, tenho, repetido</li>
               </ul>
             </div>
 
