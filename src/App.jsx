@@ -1026,7 +1026,7 @@ function App() {
                 return (
                   <div key={player.code} className="extra-card">
                     <div className="team-header extra-header">
-                      <span className="team-name">{player.code} {player.name}</span>
+                      <span className="team-name">{player.flag} {player.name}</span>
                       <span className="extra-team">{player.team}</span>
                       <span className={`team-percentage ${playerPercentage === 100 ? 'complete' : ''}`}>
                         {playerPercentage}%
